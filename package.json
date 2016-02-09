@@ -1,0 +1,32 @@
+{
+  "name": "package-test",
+  "version": "0.1.0",
+  "description": "A command for testing an npm package in a near real environment",
+  "main": "lib/package-test.js",
+  "scripts": {
+    "test": "bin/package-test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MeldCE/package-test.git"
+  },
+  "keywords": [
+    "npm",
+    "package",
+    "test"
+  ],
+  "author": "MeldCE Opensource",
+  "license": "GPL-3.0",
+  "bugs": {
+    "url": "https://github.com/MeldCE/package-test/issues"
+  },
+  "homepage": "https://github.com/MeldCE/package-test#readme",
+  "dependencies": {
+    "glob": "^6.0.4",
+    "mkdirp": "^0.5.1",
+    "node-cp": "^0.1.1",
+    "promise": "^7.1.1",
+    "rimraf": "^2.5.1",
+    "skemer": "^0.8.6"
+  }
+}
