@@ -1,0 +1,17 @@
+*~
+**/*~
+node_modules
+.*.sw?
+build
+reports
+src
+debug
+out
+gulpfile.js
+npm-debug.log*
+.coveralls.yml
+.coverdata
+.coverrun
+coverage
+save
+test*
