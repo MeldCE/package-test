@@ -19,14 +19,14 @@ let p = packageTest();
 console.log('waiting on package test setup promise');
 p.then(function(data) { 
   console.log('Installing production dependencies of package');
-  //child_process.execSync('npm install --production', {
-  //  cwd: data.packageFolder
-  //});
+  child_process.execSync('npm install --production', {
+    cwd: data.packageFolder
+  });
 
   console.log('Running npm test');
-  //child_process.execSync('npm test', {
-  //  cwd: data.testFolder
-  //});
+  child_process.execSync('npm test', {
+    cwd: data.testFolder
+  });
 }, function(err) { throw err; });
 
 console.log('end');

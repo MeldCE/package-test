@@ -9,9 +9,7 @@ debug
 out
 gulpfile.js
 npm-debug.log*
-.coveralls.yml
-.coverdata
-.coverrun
+.*
 coverage
 save
 test*

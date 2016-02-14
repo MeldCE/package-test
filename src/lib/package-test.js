@@ -16,6 +16,7 @@ var access = Promise.denodeify(fs.access);
 var glob = Promise.denodeify(require('glob'));
 var readFile = Promise.denodeify(fs.readFile);
 var stat = Promise.denodeify(fs.stat);
+let readdir = Promise.denodeify(fs.readdir);
 
 var packageInfo = {
   name: 'todo'
@@ -36,15 +37,34 @@ var schemaOptions = { type: {
   testFiles: {
     doc: 'An Array or an Object of Arrays',
     types: {
+      string: {
+        doc: 'A glob of files to recursively copy over to the test folder',
+        type: 'string'
+      },
       array: {
+        doc: 'An array of globs of files to recursively copy over to the '
+            + 'test folder',
         type: 'string',
         multiple: true
       },
       object: {
+        doc: 'An array of sets of objects to copy accross',
         type: {
           files: {
-            type: 'string',
-            multiple: true,
+            types: {
+              string: {
+                doc: 'A glob of files to recursively copy over to the test '
+                    + 'folder',
+                type: 'string'
+              },
+              array: {
+                doc: 'An array of globs of files to recursively copy over to '
+                    + 'the test folder',
+                type: 'string',
+                multiple: true,
+                required: [1]
+              }
+            },
             required: true
           },
           base: {
@@ -65,6 +85,46 @@ var schemaOptions = { type: {
     default: true
   }
 }, required: true};
+
+
+function ignoreWalk(dir, ignoreFilter, dest, base) {
+  let array = [];
+
+  let f, files = fs.readdirSync((dir ? dir : '.'));
+
+  for (f in files) {
+    let file = (dir ? path.join(dir, files[f]) : files[f]);
+    if (ignoreFilter(file)) {
+      // Add to list
+      array.push(file);
+
+      // Go into if a directory
+      let stats = fs.statSync(file);
+
+      let destPath;
+
+      if (dest) {
+        if (!base 
+            || (destPath = path.relative(base, file))
+            || destPath.length > file.length) {
+          destPath = file;
+        }
+      }
+
+      if (stats.isDirectory()) {
+        if (dest) {
+          mkdir.sync(path.join(dest, destPath));
+        }
+        array = array.concat(ignoreWalk(file, ignoreFilter, dest, base));
+      } else if (dest) {
+        cp.sync(file, path.join(dest, destPath));
+      }
+    }
+  }
+
+  return array;
+}
+
 
 module.exports = function packageTest(options) {
   return new Promise(function packageTestPromise(resolve, reject) {
@@ -150,15 +210,11 @@ module.exports = function packageTest(options) {
               
               console.log('ignore is', ignore);
 
-              let filters = [
-                {
-                  filter: ignoreDoc(ignore),
-                  destination: path.join(options.testFolder,
-                      'node_modules', packageInfo.name)
-                }
-              ];
+              // Copy over production files as would be by npm
+              ignoreWalk('', ignoreDoc(ignore), path.join(options.testFolder,
+                      'node_modules', packageInfo.name));
 
-              // Add test file destinations
+              /* TODO / Copy files specified in options
               if (options.testFiles) {
                 if (options.testFiles instanceof Array) {
                   // Copy all files to test directory
@@ -177,50 +233,9 @@ module.exports = function packageTest(options) {
                     filters.push(options.testFiles[f]);
                   }
                 }
-              }
+              }*/
 
-              // Change into the filter
-              return glob('**').then(function(files) {
-                //console.log(files);
-                let f;
-
-                let cps = [];
-                // Copy package files into the package directory
-                console.log('have filters', filters);
-                try {
-                  for (f in files) {
-                    let i;
-                    for (i in filters) {
-                        let file = files[f];
-                        if (filters[i].filter(files[f])) {
-                          let stats = fs.statSync(file);
-                          let destFile;
-                          // Shorten the file name with base if it is available
-                          if (!filters[i].base 
-                              || (destFile = path.relative(filters[i].base, files[f]))
-                              || destFile.length > files[f].length) {
-                            destFile = files[f];
-                          }
-                          if (stats.isDirectory()) {
-                            console.log('mkdir', path.join(filters[i].destination, destFile));
-                            mkdir.sync(path.join(filters[i].destination, destFile));
-                          } else {
-                            console.log('cp', file, path.join(filters[i].destination, destFile));
-                            cp.sync(file,
-                                path.join(filters[i].destination, destFile));
-                          }
-                        }
-                    }
-                    console.log('.');
-                  }
-
-                  console.log('finished looking through files, returning resolved');
-                  return Promise.resolve();
-                } catch(err) {
-                  console.log(err);
-                  return Promise.reject(err);
-                }
-              });
+              return Promise.resolve();
             })
       ]).then(function() {
         console.log('cps finished', arguments);
