@@ -18,10 +18,6 @@ var readFile = Promise.denodeify(fs.readFile);
 var stat = Promise.denodeify(fs.stat);
 let readdir = Promise.denodeify(fs.readdir);
 
-var packageInfo = {
-  name: 'todo'
-};
-
 var schemaOptions = { type: {
   packageDirectory: {
     type: 'string'
@@ -127,10 +123,13 @@ function ignoreWalk(dir, ignoreFilter, dest, base) {
 
 
 module.exports = function packageTest(options) {
+  let packageInfo; 
   return new Promise(function packageTestPromise(resolve, reject) {
     let fileOptions;
+    let packageFile = path.join(process.cwd(), 'package.json');
     // Check package.json exists
-    access(path.join(process.cwd(), 'package.json'), fs.R_OK).then(function() {
+    access(packageFile, fs.R_OK).then(function() {
+      packageInfo = require(packageFile);
       // Check if there is a settings file
       return access(path.join(process.cwd(), '.package-test.json'), fs.R_OK)
           .then(function() {
@@ -146,8 +145,7 @@ module.exports = function packageTest(options) {
         options = skemer.validateNew({
           parameterName: 'options',
           schema: schemaOptions
-        }, fileOptions, options);
-        console.log('options are', options | {});
+        }, fileOptions, options || {});
         resolve();
       } catch(err) {
         console.log('err', err);
@@ -158,10 +156,8 @@ module.exports = function packageTest(options) {
           + path.join(process.cwd(), 'package.json'), err));
     });
   }).then(function() {
-    console.log('options are', options);
     // Check if the folder already exists
     return access(options.testFolder, fs.F_OK).then(function() {
-      console.log('got no error when accessing test folder', arguments);
       if (options.deleteFolder) {
         // Try an delete folder
         return rimraf(options.testFolder);
@@ -170,7 +166,6 @@ module.exports = function packageTest(options) {
         return Promise.reject(new Error('Test folder already exists'));
       }
     }, function(err) {
-      console.log('got access error on test folder');
       if (err.errno !== -2) {
         err.message = 'Error checking test folder existence: ' + err.message;
         return Promise.reject(err);
@@ -207,8 +202,6 @@ module.exports = function packageTest(options) {
                   + '.git\n.hg\n.npmrc\n'
                   + '.lock-wscript\n.svn\n.wafpickle-*\nconfig.gypi\nCVS\n'
                   + 'npm-debug.log\nnode_modules\n' + ignore;
-              
-              console.log('ignore is', ignore);
 
               // Copy over production files as would be by npm
               ignoreWalk('', ignoreDoc(ignore), path.join(options.testFolder,
@@ -238,7 +231,6 @@ module.exports = function packageTest(options) {
               return Promise.resolve();
             })
       ]).then(function() {
-        console.log('cps finished', arguments);
         return Promise.resolve({
           testFolder: options.testFolder,
           packageFolder: path.join(options.testFolder,
