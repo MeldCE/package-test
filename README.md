@@ -1,10 +1,83 @@
 # package-test
-A command for testing an npm package in a near real environment
+A module for testing an npm package in a near real environment.
 
-## Idea for testing process
-1. Create the test directory `package-test`
-1. Copy the package files (those in the directory except those that would be excluded by npm) into `package-test/node_modules/<module_name>`
-1. Copy the `package.json` file into `package-test/node_modules/<module_name>`
-1. In `package-test/node_modules/<module_name>`, run npm install --production
-1. Copy `package.json` any test files (specified in `.testfiles`) into `package-test`
-1. In `package-test`, run the test command specified in `package.json`
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+
+
+- [package-test](#package-test)
+- [packageJson](#packagejson)
+- [testConfig](#testconfig)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
+The module provides the command `package-test`. Running command will:
+1. Copy the package files as they would be by npm to a testing directory
+1. install the dependencies of the package (using `npm install --production`)
+1. copy over any testing files
+1. run the test command in the testing directory
+
+The testing files and the test command to run can be specified in a JSON file
+named `.package-test.json`.
+
+The module itself can also be used within another script to copy of the files
+to the test directory (steps 1 and 3 above).
+
+```javascript
+var packageTest = require('package-test');
+
+// Get a promise of setting up the test directory
+packageTest().then(function() {
+  // Do some stuff after the files have been copied over
+});
+```
+
+## package-test
+
+Sets up a package test environment (a folder) by copying the package as it
+would be exported by NPM, installing any dependencies (by running
+`npm install --production` in the module folder) and then copying any
+additional testing files.
+
+**Parameters**
+
+-   `options` **object** package-test options
+    -   `options.testFolder` **[string]** The path to the test folder to create.
+               If not given, it will default to the name of the package
+    -   `options.testFiles` **[string or Array&lt;string&gt; or Array&lt;Object&gt;]** A glob string to
+               match the test files to copy over to the test folder, an Array of
+               globs string match test files to copy over or an Array of Objects
+               with a `files` parameter, specyfing the glob  or array of globs to
+               match the files to copy, a `destination` parameter, specifying where
+               to copy the files to, and a `base` parameter, specifying a part of
+               the path to remove  from the test files when copying
+    -   `options.testCommand` **[string or boolean]** Test command that should be
+               run instead of the one specified in the package.json file
+    -   `options.deleteFolder` **[boolean]**  (optional, default `true`)
+
+Returns **Promise** A promise of setting up the package test folder
+
+## packageJson
+
+Retrieve the package.json in the working folder
+
+**Parameters**
+
+-   `ignoreMissing` **string** Whether to ignore a file does not exist error
+           and instead resolve to undefined
+
+Returns **Promise** A promise that will resolve to the Object contained
+         in the package.json file
+
+## testConfig
+
+Retrieve the .package-test.json file in the working folder
+
+**Parameters**
+
+-   `ignoreMissing` **string** Whether to ignore a file does not exist error
+           and instead resolve to undefined
+
+Returns **Promise** A promise that will resolve to the Object contained
+         in the .package-test.json file
+

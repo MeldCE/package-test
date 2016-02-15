@@ -16,83 +16,7 @@ var access = Promise.denodeify(fs.access);
 var glob = Promise.denodeify(require('glob'));
 var readFile = Promise.denodeify(fs.readFile);
 var stat = Promise.denodeify(fs.stat);
-
-var schemaOptions = { type: {
-  packageDirectory: {
-    type: 'string'
-  },
-  testFolder: {
-    type: 'string',
-    default: 'package-test'
-  },
-  /*XXX testPackageFile: {
-    type: 'string',
-    default: 'package.json'
-  },*/
-  testFiles: {
-    doc: 'An Array or an Object of Arrays',
-    types: {
-      string: {
-        doc: 'A glob of files to recursively copy over to the test folder',
-        type: 'string'
-      },
-      array: {
-        doc: 'An array of globs of files to recursively copy over to the '
-            + 'test folder',
-        type: 'string',
-        multiple: true
-      },
-      object: {
-        doc: 'An array of sets of objects to copy accross',
-        type: {
-          files: {
-            types: {
-              string: {
-                doc: 'A glob of files to recursively copy over to the test '
-                    + 'folder',
-                type: 'string'
-              },
-              array: {
-                doc: 'An array of globs of files to recursively copy over to '
-                    + 'the test folder',
-                type: 'string',
-                multiple: true,
-                required: [1]
-              }
-            },
-            required: true
-          },
-          base: {
-            type: 'string'
-          },
-          destination: {
-            type: 'string'
-          }
-        },
-        multiple: true
-      }
-    },
-    multiple: true,
-    object: true
-  },
-  testCommand: {
-    doc: 'Test command that should be run instead of the one specified in '
-        + 'the package.json file',
-    types: {
-      string: {
-        type: 'string'
-      },
-      bool: {
-        type: 'boolean',
-        values: [false]
-      }
-    }
-  },
-  deleteFolder: {
-    type: 'boolean',
-    default: true
-  }
-}, required: true};
+let optionsSchema = require('./options.js');
 
 /** @private
  * Walk through a directory ignore the files specified in the ignore filter,
@@ -146,7 +70,7 @@ function ignoreWalk(dir, ignoreFilter, dest, base) {
   return array;
 }
 
-/**
+/** @private
  * Copy the files given by the glob to the given destination folder
  *
  * @param {string} globString Glob to use to find the files to copy
@@ -269,6 +193,17 @@ function testConfig(ignoreMissing) {
   });
 }
 
+/**
+ * Sets up a package test environment (a folder) by copying the package as it
+ * would be exported by NPM, installing any dependencies (by running
+ * `npm install --production` in the module folder) and then copying any
+ * additional testing files.
+ *
+ * @param {object} options package-test options
+%%packageTestOptions%%
+ *
+ * @returns {Promise} A promise of setting up the package test folder
+ */
 module.exports = function packageTest(options) {
   let packageInfo; 
    
@@ -282,7 +217,7 @@ module.exports = function packageTest(options) {
       try {
         options = skemer.validateNew({
           parameterName: 'options',
-          schema: schemaOptions
+          schema: optionsSchema
         }, data[1], options || {});
         resolve();
       } catch(err) {

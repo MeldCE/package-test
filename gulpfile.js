@@ -149,28 +149,64 @@ gulp.task('complexity', ['lint', 'lint:test'], function() {
       .pipe(complexity());
 });
 
-gulp.task('docs', ['htmldocs', 'mddocs']);
+gulp.task('compile:docs', ['lint'], function() {
+  var packageTestOptions = require('./src/lib/options.js');
+  var skemer = require('skemer');
 
-gulp.task('htmldocs', ['lint'], function() {
-  return gulp.src(path.join(paths.docsSrc, '**/*.js'))
-      .pipe(documentation({ format: 'html' }))
-      .pipe(gulp.dest(paths.docs));
+  var toCompile = {
+    packageTestOptions: {
+      schema: packageTestOptions,
+      options: {
+        preLine: '   * ',
+        name: 'options',
+        wrap: 80,
+        type: 'param'
+      }
+    },
+  };
+
+  var builtDocs = {};
+  var d;
+
+  for (d in toCompile) {
+    //console.log('doing', d, toCompile[d].schema);
+    builtDocs[d] = skemer.buildJsDocs(toCompile[d].schema,
+        toCompile[d].options);
+  }
+
+  return gulp.src(paths.libSrc)
+			.pipe(replace(/%%([a-zA-Z0-9-_.]+)%%/g, function(match, param) {
+				if (builtDocs[param]) {
+					return builtDocs[param];
+				} else {
+					return match;
+				}
+			}))
+      .pipe(gulp.dest(paths.docsSrc));
 });
 
-gulp.task('mddocs', ['lint'], function() {
-  return gulp.src(path.join(paths.docsSrc, '**/*.js'))
-      .pipe(foreach(function(stream, file) {
-        return stream
-            .pipe(documentation({ format: 'md', shallow: true }))
-            .pipe(replace(/^#/gm, '##'))
-            .pipe(concat(file.relative + '.md'));
-            //.pipe(rename({
-            //  basename: file.name,
-            //  extname: '.md'
-            //}));
-      }))
-      //.pipe(concat(paths.mddoc))
-      .pipe(gulp.dest(paths.build));
+gulp.task('docs', ['compile:docs', 'htmldocs', 'mddocs']);
+
+gulp.task('htmldocs', ['lint', 'compile:docs'], function() {
+	return gulp.src(path.join(paths.docsSrc, '**/*.js'))
+			.pipe(documentation({ format: 'html' }))
+			.pipe(gulp.dest(paths.docs));
+});
+
+gulp.task('mddocs', ['lint', 'compile:docs'], function() {
+	return gulp.src(path.join(paths.docsSrc, '**/*.js'))
+			.pipe(foreach(function(stream, file) {
+				return stream
+						.pipe(documentation({ format: 'md', shallow: true }))
+						.pipe(replace(/^#/gm, '##'))
+						.pipe(concat(file.relative + '.md'));
+						//.pipe(rename({
+						//	basename: file.name,
+						//	extname: '.md'
+						//}));
+			}))
+			//.pipe(concat(paths.mddoc))
+			.pipe(gulp.dest(paths.build));
 });
 
 /*gulp.task('mddocs', ['lint'], function() {
