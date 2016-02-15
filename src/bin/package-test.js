@@ -1,12 +1,8 @@
 #!/usr/bin/env node
 'use strict';
 
-let fs = require('fs');
-let child_process = require('child_process');
-let path = require('path');
-/*fs.access('tesrt.js', fs.F_OK, function test(err) {
-  console.log('ok', err);
-});*/
+let childProcess = require('child_process');
+let Promise = require('promise');
 
 require('promise/lib/rejection-tracking').enable(
   {allRejections: true}
@@ -14,19 +10,35 @@ require('promise/lib/rejection-tracking').enable(
 
 let packageTest = require('../lib/package-test.js');
 
-console.log('Setting up environment');
-let p = packageTest();
-console.log('waiting on package test setup promise');
-p.then(function(data) { 
-  console.log('Installing production dependencies of package');
-  child_process.execSync('npm install --production', {
-    cwd: data.packageFolder
-  });
+Promise.all([
+  packageTest.packageJson(),
+  packageTest.testConfig(true)
+]).then(function(config) {
+  console.log('Setting up environment');
+  
+  let p = packageTest();
+  console.log('waiting on package test setup promise');
+  return p.then(function(data) { 
+    console.log('Installing production dependencies of package');
+    childProcess.execSync('npm install --production', {
+      cwd: data.packageFolder
+    });
 
-  console.log('Running npm test');
-  child_process.execSync('npm test', {
-    cwd: data.testFolder
-  });
-}, function(err) { throw err; });
+    let testCommand;
+    
+    if ((testCommand = (config[1] && config[1].testCommand
+        ? config[1].testCommand
+        : (config[0] && config[0].scripts && config[0].scripts.test 
+        ? config[0].scripts.test : false)))) {
+      console.log('Running `' + testCommand + '`');
+      childProcess.execSync(testCommand, {
+        cwd: data.testFolder
+      });
+    } else {
+      console.log('No test command specified, exiting');
+    }
 
-console.log('end');
+    return Promise.resolve();
+  });
+}).catch(function(err) { throw err; });
+

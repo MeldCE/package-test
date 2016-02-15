@@ -16,7 +16,6 @@ var access = Promise.denodeify(fs.access);
 var glob = Promise.denodeify(require('glob'));
 var readFile = Promise.denodeify(fs.readFile);
 var stat = Promise.denodeify(fs.stat);
-let readdir = Promise.denodeify(fs.readdir);
 
 var schemaOptions = { type: {
   packageDirectory: {
@@ -76,13 +75,31 @@ var schemaOptions = { type: {
     multiple: true,
     object: true
   },
+  testCommand: {
+    doc: 'Test command that should be run instead of the one specified in '
+        + 'the package.json file',
+    type: 'string'
+  },
   deleteFolder: {
     type: 'boolean',
     default: true
   }
 }, required: true};
 
-
+/** @private
+ * Walk through a directory ignore the files specified in the ignore filter,
+ * return a list of the files and folder encountered, and, optionally, copy
+ * the folders and files encountered into a destination folder
+ *
+ * @param {string} dir Directory to walk
+ * @param {ignore-doc-filter} ignoreFilter Ignore filter to use to ignore files
+ *        during the walk
+ * @param {string} dest Directory to copy the encountered files into
+ * @param {string} base The directory path to remove from the start of the
+ *        encountered file paths when copying to the destination folder
+ *
+ * @returns {Array} An array containing the encountered files
+ */
 function ignoreWalk(dir, ignoreFilter, dest, base) {
   let array = [];
 
@@ -121,31 +138,144 @@ function ignoreWalk(dir, ignoreFilter, dest, base) {
   return array;
 }
 
+/**
+ * Copy the files given by the glob to the given destination folder
+ *
+ * @param {string} globString Glob to use to find the files to copy
+ * @param {string} dest Directory to copy the found files into
+ * @param {string} base The directory path to remove from the start of the
+ *        found file paths when copying to the destination folder
+ *
+ * @returns {Promise} A promise that all files found will be copied
+ */
+function globCopy(globString, dest, base) {
+  return new Promise(function(resolve, reject) {
+    if (!dest) {
+      reject(new Error('No folder given to copy the files into'));
+    } else {
+      access(dest, fs.W_OK).then(function() {
+      }, function(err) {
+        if (err.code === 'ENOENT') {
+          // Try creating the destination folder
+          return mkdirp(dest).catch(function(merr) {
+            merr.message = 'Error creating destination folder: '
+                + merr.message;
+            return Promise.reject(merr);
+          });
+        } else {
+          err.message = 'Error with destination folder: ' + err.message;
+          return Promise.reject(err);
+        }
+      }).then(function() {
+        return glob(globString);
+      }).then(function(files) {
+        let f, cps = [];
+        for (f in files) {
+          let file = files[f];
+          cps.push(stat(file).then(function(stats) {
+            let destPath;
+
+            if (!base 
+                || (destPath = path.relative(base, file))
+                || destPath.length > file.length) {
+              destPath = file;
+            }
+
+            if (stats.isDirectory()) {
+              return mkdirp(path.join(dest, destPath)).then(function() {
+                return Promise.resolve(file);
+              });
+            } else if (dest) {
+              return cp(file, path.join(dest, destPath)).then(function() {
+                return Promise.resolve(file);
+              });
+            }
+          }));
+        }
+
+        return Promise.all(cps);
+      }, function(err) {
+        reject(err);
+      });
+    }
+  });
+}
+
+/**
+ * Retrieve the package.json in the working folder
+ *
+ * @param {string} ignoreMissing Whether to ignore a file does not exist error
+ *        and instead resolve to undefined
+ *
+ * @returns {Promise} A promise that will resolve to the Object contained
+ *          in the package.json file
+ */
+function packageJson(ignoreMissing) {
+  return new Promise(function packageJsonPromise(resolve, reject) {
+    let packageFile = path.join(process.cwd(), 'package.json');
+    access(packageFile, fs.R_OK).then(function() {
+      try {
+        resolve(require(packageFile));
+      } catch(err) {
+        err.message = 'package.json: ' + err.message;
+        reject(err);
+      }
+    }, function(err) {
+      if (ignoreMissing && err.code === 'ENOENT') {
+        resolve();
+      } else {
+        err.message = 'package.json: ' + err.message;
+        reject(err);
+      }
+    });
+  });
+}
+
+/**
+ * Retrieve the .package-test.json file in the working folder
+ *
+ * @param {string} ignoreMissing Whether to ignore a file does not exist error
+ *        and instead resolve to undefined
+ *
+ * @returns {Promise} A promise that will resolve to the Object contained
+ *          in the .package-test.json file
+ */
+function testConfig(ignoreMissing) {
+  return new Promise(function testConfigPromise(resolve, reject) {
+    let testConfigFile = path.join(process.cwd(), '.package-test.json');
+    access(testConfigFile, fs.R_OK).then(function() {
+      try {
+        resolve(require(testConfigFile));
+      } catch(err) {
+        err.message = '.package-test.json: ' + err.message;
+        reject(err);
+      }
+    }, function(err) {
+      if (ignoreMissing && err.code === 'ENOENT') {
+        resolve();
+      } else {
+        err.message = '.package-test.json: ' + err.message;
+        reject(err);
+      }
+    });
+  });
+}
 
 module.exports = function packageTest(options) {
   let packageInfo; 
+   
   return new Promise(function packageTestPromise(resolve, reject) {
-    let fileOptions;
-    let packageFile = path.join(process.cwd(), 'package.json');
-    // Check package.json exists
-    access(packageFile, fs.R_OK).then(function() {
-      packageInfo = require(packageFile);
-      // Check if there is a settings file
-      return access(path.join(process.cwd(), '.package-test.json'), fs.R_OK)
-          .then(function() {
-            fileOptions = require(path.join(process.cwd(),
-                '.package-test.json'));
-            return Promise.resolve();
-          }, function() {
-            return Promise.resolve();
-          });
-    }).then(function() {
-      //var package = require('./package.json');
+    Promise.all([
+      packageJson(),
+      testConfig(true)
+    ]).then(function(data) {
+      packageInfo = data[0];
+
       try {
         options = skemer.validateNew({
           parameterName: 'options',
           schema: schemaOptions
-        }, fileOptions, options || {});
+        }, data[1], options || {});
         resolve();
       } catch(err) {
         console.log('err', err);
@@ -207,28 +337,47 @@ module.exports = function packageTest(options) {
               ignoreWalk('', ignoreDoc(ignore), path.join(options.testFolder,
                       'node_modules', packageInfo.name));
 
-              /* TODO / Copy files specified in options
+              // Copy files specified in options
               if (options.testFiles) {
-                if (options.testFiles instanceof Array) {
+                let cps;
+
+                
+                if (typeof options.testFiles === 'string') {
+                  cps.push(globCopy(options.testFiles, options.testFolder));
+                } else if (options.testFiles instanceof Array) {
                   // Copy all files to test directory
-                  filters.push({
-                    filter: ignoreDoc('', options.testFiles),
-                    destination: options.testFolder
-                  });
+                  let f;
+                  for (f in options.testFiles) {
+                    cps.push(globCopy(options.testFiles[f],
+                        options.testFolder));
+                  }
                 } else {
                   let f;
                   for (f in options.testFiles) {
                     if (!options.testFiles[f].destination) {
                       options.testFiles[f].destination = options.testFolder;
                     }
-                    options.testFiles[f].filter = ignoreDoc('',
-                        options.testFiles[f].files);
-                    filters.push(options.testFiles[f]);
+
+                    if (typeof options.testFiles[f].files === 'string') {
+                      cps.push(globCopy(options.testFiles[f].files,
+                          options.testFiles[f].destination,
+                          options.testFiles[f].base));
+                    } else if (options.testFiles[f].files  instanceof Array) {
+                      // Copy all files to test directory
+                      let i;
+                      for (i in options.testFiles[f].files) {
+                        cps.push(globCopy(options.testFiles[f].files[i],
+                            options.testFiles[f].destination,
+                            options.testFiles[f].base));
+                      }
+                    }
                   }
                 }
-              }*/
 
-              return Promise.resolve();
+                return Promise.all(cps);
+              } else {
+                return Promise.resolve();
+              }
             })
       ]).then(function() {
         return Promise.resolve({
@@ -240,3 +389,6 @@ module.exports = function packageTest(options) {
     });
   });
 };
+
+module.exports.testConfig = testConfig;
+module.exports.packageJson = packageJson;
