@@ -78,7 +78,15 @@ var schemaOptions = { type: {
   testCommand: {
     doc: 'Test command that should be run instead of the one specified in '
         + 'the package.json file',
-    type: 'string'
+    types: {
+      string: {
+        type: 'string'
+      },
+      bool: {
+        type: 'boolean',
+        values: [false]
+      }
+    }
   },
   deleteFolder: {
     type: 'boolean',
