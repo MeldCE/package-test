@@ -141,6 +141,8 @@ function globCopy(globString, dest, base) {
  *
  * @returns {Promise} A promise that will resolve to the Object contained
  *          in the package.json file
+ *
+ * @name packageTest.packageJson
  */
 function packageJson(ignoreMissing) {
   return new Promise(function packageJsonPromise(resolve, reject) {
@@ -171,6 +173,8 @@ function packageJson(ignoreMissing) {
  *
  * @returns {Promise} A promise that will resolve to the Object contained
  *          in the .package-test.json file
+ *
+ * @name packageTest.testConfig
  */
 function testConfig(ignoreMissing) {
   return new Promise(function testConfigPromise(resolve, reject) {
@@ -202,7 +206,11 @@ function testConfig(ignoreMissing) {
  * @param {object} options package-test options
 %%packageTestOptions%%
  *
- * @returns {Promise} A promise of setting up the package test folder
+ * @returns {Promise} A promise of setting up the package test folder that will
+ *          resolve to an Object containing the `testFolder` and the
+ *          `packageFolder` in node_modules of the test folder
+ *
+ * @name packageTest
  */
 module.exports = function packageTest(options) {
   let packageInfo; 
@@ -219,7 +227,25 @@ module.exports = function packageTest(options) {
           parameterName: 'options',
           schema: optionsSchema
         }, data[1], options || {});
-        resolve();
+
+        /* If no test folder, set to package name and set noDeleteFolder to
+         * true if it isn't set
+         */
+        if (options.testFolder === undefined) {
+          options.testFolder = packageInfo.name;
+
+          if (options.noDeleteFolder === undefined) {
+            options.noDeleteFolder = true;
+          }
+        }
+
+        // Empty if have an empty string for the test folder
+        if (!options.testFolder) {
+          reject(new Error('Can\'t have an empty string for '
+              + '`options.testFolder`'));
+        } else {
+          resolve();
+        }
       } catch(err) {
         console.log('err', err);
         reject(err);
@@ -231,12 +257,14 @@ module.exports = function packageTest(options) {
   }).then(function() {
     // Check if the folder already exists
     return access(options.testFolder, fs.F_OK).then(function() {
-      if (options.deleteFolder) {
+      if (!options.noDeleteFolder) {
         // Try an delete folder
         return rimraf(options.testFolder);
       } else {
         // Reject as don't want a polluted fake environment
-        return Promise.reject(new Error('Test folder already exists'));
+        return Promise.reject(new Error('Test folder `' + options.testFolder
+            + '` already exists. If would like to delete it, set '
+            + '`noDeleteFolder` in `.package-test.json` to `false`'));
       }
     }, function(err) {
       if (err.errno !== -2) {

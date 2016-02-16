@@ -1,4 +1,4 @@
-# package-test
+# Package Test
 A module for testing an npm package in a near real environment.
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->

@@ -1,13 +1,13 @@
-# package-test
+# Package Test
 A module for testing an npm package in a near real environment.
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 
 
-- [package-test](#package-test)
-- [packageJson](#packagejson)
-- [testConfig](#testconfig)
+- [packageTest](#packagetest)
+- [packageTest.packageJson](#packagetestpackagejson)
+- [packageTest.testConfig](#packagetesttestconfig)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -32,7 +32,7 @@ packageTest().then(function() {
 });
 ```
 
-## package-test
+## packageTest
 
 Sets up a package test environment (a folder) by copying the package as it
 would be exported by NPM, installing any dependencies (by running
@@ -53,11 +53,15 @@ additional testing files.
                the path to remove  from the test files when copying
     -   `options.testCommand` **[string or boolean]** Test command that should be
                run instead of the one specified in the package.json file
-    -   `options.deleteFolder` **[boolean]**  (optional, default `true`)
+    -   `options.noDeleteFolder` **[boolean]** Whether or not to not delete the
+               test folder (and fail) if it already exists. If `testFolder` is not
+               set, this must be set to `false` to delete the existing folder
 
-Returns **Promise** A promise of setting up the package test folder
+Returns **Promise** A promise of setting up the package test folder that will
+         resolve to an Object containing the `testFolder` and the
+         `packageFolder` in node_modules of the test folder
 
-## packageJson
+## packageTest.packageJson
 
 Retrieve the package.json in the working folder
 
@@ -69,7 +73,7 @@ Retrieve the package.json in the working folder
 Returns **Promise** A promise that will resolve to the Object contained
          in the package.json file
 
-## testConfig
+## packageTest.testConfig
 
 Retrieve the .package-test.json file in the working folder
 

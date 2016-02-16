@@ -81,8 +81,10 @@ var packageTestOptions = module.exports = { type: {
       }
     }
   },
-  deleteFolder: {
-    type: 'boolean',
-    default: true
+  noDeleteFolder: {
+    doc: 'Whether or not to not delete the test folder (and fail) if it '
+        + 'already exists. If `testFolder` is not set, this must be set to '
+        + '`false` to delete the existing folder',
+    type: 'boolean'
   }
 }, required: true};

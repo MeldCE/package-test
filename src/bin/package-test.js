@@ -10,10 +10,7 @@ require('promise/lib/rejection-tracking').enable(
 
 let packageTest = require('../lib/package-test.js');
 
-Promise.all([
-  packageTest.packageJson(),
-  packageTest.testConfig(true)
-]).then(function(config) {
+  packageTest.testConfig(true).then(function(config) {
   console.log('Setting up environment');
   
   let p = packageTest();
@@ -26,16 +23,12 @@ Promise.all([
 
     let testCommand;
     
-    if ((testCommand = (config[1] && config[1].testCommand
-        ? config[1].testCommand
-        : (config[0] && config[0].scripts && config[0].scripts.test 
-        ? config[0].scripts.test : false)))) {
+    if ((testCommand = (config && config.testCommand !== undefined
+        ? config.testCommand : 'npm test'))) {
       console.log('Running `' + testCommand + '`');
       childProcess.execSync(testCommand, {
         cwd: data.testFolder
       });
-    } else {
-      console.log('No test command specified, exiting');
     }
 
     return Promise.resolve();
